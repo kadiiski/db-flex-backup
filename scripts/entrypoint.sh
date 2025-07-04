@@ -7,11 +7,11 @@ set -e
 # Create crontab directory if it doesn't exist
 mkdir -p /etc/crontabs
 
-# Write a cron job that invokes our backup script
-echo "$CRON_SCHEDULE /backup.sh backup" >/etc/crontabs/root
+# Write a cron job that invokes our backup command
+echo "$CRON_SCHEDULE backup backup" >/etc/crontabs/root
 
-# Ensure the backup script is executable
-chmod +x /backup.sh
+# Ensure all backup scripts are executable
+chmod +x /usr/local/bin/backup_main.sh /usr/local/bin/utils.sh /usr/local/bin/mysql_backup.sh /usr/local/bin/postgres_backup.sh /backup.sh
 
 # Launch cron in foreground with logs to stdout
 exec crond -f -L /dev/stdout

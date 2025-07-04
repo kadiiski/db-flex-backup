@@ -1,204 +1,269 @@
-# MySQL S3 Backup Docker Image
+# Database S3 Backup
 
-A Docker image for automated MySQL database backups to S3-compatible storage. This image provides a simple way to backup your MySQL databases to any S3-compatible storage service, including AWS S3 and Cloudflare R2.
+A Docker image for automated MySQL and PostgreSQL database backups to S3-compatible storage with configurable retention policies.
 
 ## Features
 
-- Automated daily backups (configurable schedule)
-- Support for full database or specific database backups
-- Automatic backup retention management
-- Restore functionality
-- S3-compatible storage support (works with AWS S3, Cloudflare R2, MinIO, etc.)
-- Detailed logging
-- Error handling and cleanup
-- Multi-architecture support (amd64 and arm64)
-
-## System Requirements
-
-The image includes all necessary dependencies:
-- MySQL client tools (mysqldump, mysql)
-- AWS CLI for S3 operations
-- gzip for compression
-- cron for scheduling
+- **Multi-Database Support**: Both MySQL and PostgreSQL
+- **S3-Compatible Storage**: Works with AWS S3, MinIO, and other S3-compatible services
+- **Automated Scheduling**: Configurable cron-based backups
+- **Retention Management**: Automatic cleanup of old backups
+- **Compression**: All backups are gzipped for storage efficiency
+- **Easy Restore**: Simple restore functionality from any backup
+- **Backward Compatibility**: Existing MySQL setups continue to work unchanged
 
 ## Quick Start
 
-1. Pull the image:
-```bash
-docker pull kadiiski/mysql-s3-backup:latest
-```
+### MySQL Backup
 
-2. Run the container with required environment variables:
 ```bash
 docker run -d \
   --name mysql-backup \
+  -e DB_TYPE=mysql \
   -e MYSQL_HOST=your-mysql-host \
-  -e MYSQL_USER=your-mysql-user \
-  -e MYSQL_PASSWORD=your-mysql-password \
-  -e S3_BUCKET=your-s3-bucket \
-  -e AWS_ENDPOINT_URL=your-s3-endpoint \
-  -e AWS_ACCESS_KEY_ID=your-access-key \
-  -e AWS_SECRET_ACCESS_KEY=your-secret-key \
-  kadiiski/mysql-s3-backup:latest
+  -e MYSQL_USER=backup_user \
+  -e MYSQL_PASSWORD=your_password \
+  -e S3_BUCKET=your-backup-bucket \
+  -e AWS_ENDPOINT_URL=https://s3.amazonaws.com \
+  -e AWS_ACCESS_KEY_ID=your_access_key \
+  -e AWS_SECRET_ACCESS_KEY=your_secret_key \
+  kadiiski/mysql-s3-backup
+```
+
+### PostgreSQL Backup
+
+```bash
+docker run -d \
+  --name postgres-backup \
+  -e DB_TYPE=postgres \
+  -e POSTGRES_HOST=your-postgres-host \
+  -e POSTGRES_USER=backup_user \
+  -e POSTGRES_PASSWORD=your_password \
+  -e S3_BUCKET=your-backup-bucket \
+  -e AWS_ENDPOINT_URL=https://s3.amazonaws.com \
+  -e AWS_ACCESS_KEY_ID=your_access_key \
+  -e AWS_SECRET_ACCESS_KEY=your_secret_key \
+  kadiiski/mysql-s3-backup
 ```
 
 ## Environment Variables
 
-### Required Variables
+### Database Type Configuration
 
-- `MYSQL_HOST`: MySQL server hostname
-- `MYSQL_USER`: MySQL username
-- `MYSQL_PASSWORD`: MySQL password
-- `S3_BUCKET`: S3 bucket name
-- `AWS_ENDPOINT_URL`: S3 endpoint URL (required for S3-compatible storage)
-- `AWS_ACCESS_KEY_ID`: AWS access key
-- `AWS_SECRET_ACCESS_KEY`: AWS secret key
+| Variable | Description | Default | Required |
+|----------|-------------|---------|----------|
+| `DB_TYPE` | Database type: `mysql` or `postgres` | `mysql` | No |
 
-### Optional Variables
+### MySQL Configuration
 
-- `MYSQL_PORT`: MySQL port (default: 3306)
-- `MYSQL_DATABASE`: Specific database to backup (default: all databases)
-- `S3_PREFIX`: S3 prefix/path (default: mysql)
-- `RETENTION_COUNT`: Number of backups to keep (default: 7)
-- `CRON_SCHEDULE`: Cron schedule for backups (default: "0 0 * * *" - daily at midnight)
-- `TZ`: Timezone (default: Europe/Sofia)
+| Variable | Description | Default | Required |
+|----------|-------------|---------|----------|
+| `MYSQL_HOST` | MySQL server hostname | - | Yes (for MySQL) |
+| `MYSQL_PORT` | MySQL port | `3306` | No |
+| `MYSQL_USER` | MySQL username | - | Yes (for MySQL) |
+| `MYSQL_PASSWORD` | MySQL password | - | Yes (for MySQL) |
+| `MYSQL_DATABASE` | Specific database to backup (optional) | - | No |
 
-## Usage Examples
+### PostgreSQL Configuration
 
-### List Available Backups
+| Variable | Description | Default | Required |
+|----------|-------------|---------|----------|
+| `POSTGRES_HOST` | PostgreSQL server hostname | - | Yes (for PostgreSQL) |
+| `POSTGRES_PORT` | PostgreSQL port | `5432` | No |
+| `POSTGRES_USER` | PostgreSQL username | - | Yes (for PostgreSQL) |
+| `POSTGRES_PASSWORD` | PostgreSQL password | - | Yes (for PostgreSQL) |
+| `POSTGRES_DATABASE` | Specific database to backup (optional) | - | No |
+
+### S3 Configuration
+
+| Variable | Description | Default | Required |
+|----------|-------------|---------|----------|
+| `S3_BUCKET` | S3 bucket name | - | Yes |
+| `S3_PREFIX` | S3 prefix/path | `backups` | No |
+| `AWS_ENDPOINT_URL` | S3 endpoint URL | - | Yes |
+| `AWS_ACCESS_KEY_ID` | AWS access key | - | Yes |
+| `AWS_SECRET_ACCESS_KEY` | AWS secret key | - | Yes |
+
+### Scheduling & Retention
+
+| Variable | Description | Default | Required |
+|----------|-------------|---------|----------|
+| `CRON_SCHEDULE` | Cron schedule for backups | `0 0 * * *` (daily at midnight) | No |
+| `RETENTION_COUNT` | Number of backups to keep | `7` | No |
+| `TZ` | Timezone for cron jobs | `Europe/Sofia` | No |
+
+## Usage
+
+### Automated Backups
+
+The container runs automated backups based on the `CRON_SCHEDULE`. Default is daily at midnight (`0 0 * * *`).
+
+### Manual Operations
+
+You can run manual operations using the `backup` command:
 
 ```bash
-docker exec mysql-backup /backup.sh list
+# List available backups
+docker exec mysql-backup backup list
+
+# Create manual backup
+docker exec mysql-backup backup backup
+
+# Restore from specific backup
+docker exec mysql-backup backup restore backup-2024-05-21_10-30-00.sql.gz
 ```
 
-### Manual Backup
+### Database-Specific Examples
 
-```bash
-docker exec mysql-backup /backup.sh backup
-```
-
-### Restore from Backup
-
-```bash
-docker exec mysql-backup /backup.sh restore backup-2024-05-21_10-30-00.sql.gz
-```
-
-### Custom Backup Schedule
+#### MySQL: Backup specific database
 
 ```bash
 docker run -d \
-  --name mysql-backup \
-  -e CRON_SCHEDULE="0 2 * * *" \  # Run at 2 AM daily
-  ... other environment variables ...
-  mysql-s3-backup
+  --name mysql-app-backup \
+  -e DB_TYPE=mysql \
+  -e MYSQL_HOST=db.example.com \
+  -e MYSQL_USER=backup_user \
+  -e MYSQL_PASSWORD=secure_password \
+  -e MYSQL_DATABASE=myapp \
+  -e S3_BUCKET=backups \
+  -e S3_PREFIX=mysql/myapp \
+  -e AWS_ENDPOINT_URL=https://s3.amazonaws.com \
+  -e AWS_ACCESS_KEY_ID=AKIA... \
+  -e AWS_SECRET_ACCESS_KEY=xxx \
+  -e CRON_SCHEDULE="0 2 * * *" \
+  kadiiski/mysql-s3-backup
 ```
 
-## Docker Compose Example
+#### PostgreSQL: All databases with custom retention
+
+```bash
+docker run -d \
+  --name postgres-full-backup \
+  -e DB_TYPE=postgres \
+  -e POSTGRES_HOST=postgres.example.com \
+  -e POSTGRES_USER=postgres \
+  -e POSTGRES_PASSWORD=secure_password \
+  -e S3_BUCKET=backups \
+  -e S3_PREFIX=postgres/full \
+  -e RETENTION_COUNT=14 \
+  -e AWS_ENDPOINT_URL=https://minio.example.com \
+  -e AWS_ACCESS_KEY_ID=minioadmin \
+  -e AWS_SECRET_ACCESS_KEY=minioadmin \
+  -e CRON_SCHEDULE="0 3 * * *" \
+  kadiiski/mysql-s3-backup
+```
+
+## Docker Compose Examples
+
+### MySQL
 
 ```yaml
 version: '3.8'
-
 services:
-  mysql-s3-backup:
-    image: kadiiski/mysql-s3-backup:latest
-    pull_policy: always  # Ensures the latest version is pulled on each deployment
-    container_name: mysql_s3_backup
-    depends_on:
-      mariadb:
-        condition: service_healthy
+  mysql-backup:
+    image: kadiiski/mysql-s3-backup
     environment:
-      # MySQL connection
-      MYSQL_HOST: mariadb
-      MYSQL_PORT: "3306"
-      MYSQL_USER: ${MYSQL_USER:-symfony}
-      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-symfony}
-      MYSQL_DATABASE: my_database  # Optional: specific database to backup
-      
-      # S3/R2 configuration
-      S3_BUCKET: my-backups
-      S3_PREFIX: mysql-backups
-      AWS_ACCESS_KEY_ID: ${R2_ACCESS_KEY_ID}      # Use R2_ACCESS_KEY_ID for Cloudflare R2
-      AWS_SECRET_ACCESS_KEY: ${R2_SECRET_KEY}     # Use R2_SECRET_KEY for Cloudflare R2
-      AWS_ENDPOINT_URL: ${R2_ENDPOINT_URL}        # Required for Cloudflare R2 (e.g., https://<account_id>.r2.cloudflarestorage.com)
-      
-      # Backup configuration
-      CRON_SCHEDULE: "0 0 * * *"  # Daily at midnight
-      RETENTION_COUNT: 10  # Keep last 7 backups
-      TZ: Europe/Sofia
+      DB_TYPE: mysql
+      MYSQL_HOST: mysql
+      MYSQL_USER: backup_user
+      MYSQL_PASSWORD: backup_password
+      S3_BUCKET: mysql-backups
+      S3_PREFIX: production
+      AWS_ENDPOINT_URL: https://s3.amazonaws.com
+      AWS_ACCESS_KEY_ID: your_access_key
+      AWS_SECRET_ACCESS_KEY: your_secret_key
+      CRON_SCHEDULE: "0 2 * * *"
+      RETENTION_COUNT: 7
     restart: unless-stopped
-    networks:
-      - app-network
-
-networks:
-  app-network:
-    driver: bridge
 ```
 
-This example shows:
-- Using the latest multi-arch image
-- Automatic pulling of the latest version on each deployment
-- Health check dependency on the database
-- Environment variable configuration with defaults
-- Network configuration
-- All available configuration options
-- Cloudflare R2 integration example
+### PostgreSQL
 
-### Updating the Latest Tag
+```yaml
+version: '3.8'
+services:
+  postgres-backup:
+    image: kadiiski/mysql-s3-backup
+    environment:
+      DB_TYPE: postgres
+      POSTGRES_HOST: postgres
+      POSTGRES_USER: backup_user
+      POSTGRES_PASSWORD: backup_password
+      S3_BUCKET: postgres-backups
+      S3_PREFIX: production
+      AWS_ENDPOINT_URL: https://s3.amazonaws.com
+      AWS_ACCESS_KEY_ID: your_access_key
+      AWS_SECRET_ACCESS_KEY: your_secret_key
+      CRON_SCHEDULE: "0 3 * * *"
+      RETENTION_COUNT: 14
+    restart: unless-stopped
+```
 
-When using the `:latest` tag, you can ensure you always get the latest version by:
+## Backup Behavior
 
-1. Using `pull_policy: always` in your docker-compose.yml (as shown above)
-2. Running `docker-compose pull` before `docker-compose up`
-3. Using `docker-compose up --pull always`
+### MySQL Backups
+- **All databases**: Uses `mysqldump --all-databases --add-drop-database` when no specific database is set
+- **Specific database**: Uses `mysqldump --databases <db_name> --add-drop-database` when `MYSQL_DATABASE` is specified
+- **Restore**: Connects directly to the target database or uses default connection for all-database restores
 
-This ensures your container will always use the most recent version of the image when you rebuild your stack.
+### PostgreSQL Backups
+- **All databases**: Uses `pg_dumpall --clean` to backup all databases and roles
+- **Specific database**: Uses `pg_dump --clean --create --if-exists` for single database backups
+- **Restore**: 
+  - For specific databases: Explicitly terminates connections, drops the existing database, then recreates it from backup
+  - For all databases: Uses the `pg_dumpall` restore which handles all database recreation
+  - Always connects to the `postgres` maintenance database for proper permissions
 
-### Cloudflare R2 Configuration
+## Backward Compatibility
 
-To use with Cloudflare R2:
-1. Set `AWS_ENDPOINT_URL` to your R2 endpoint (e.g., `https://<account_id>.r2.cloudflarestorage.com`)
-2. Use your R2 credentials for `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY`
-3. Create a bucket in R2 and set it as `S3_BUCKET`
+**Existing MySQL setups continue to work unchanged!** If you're upgrading from version 1.x:
 
-The image works seamlessly with R2 as it's fully S3-compatible.
+- All existing environment variables work as before
+- The original `./backup.sh` script still works and automatically sets `DB_TYPE=mysql`
+- Default behavior remains the same for MySQL
+- S3_PREFIX defaults to `mysql` when using the legacy backup.sh script
 
-## Building and Publishing
+## Backup File Format
 
-### Quick Build (Single Architecture)
+Backups are stored with the following naming convention:
+```
+backup-YYYY-MM-DD_HH-MM-SS.sql.gz
+```
 
-1. Build the image:
+Examples:
+- `backup-2024-05-21_14-30-45.sql.gz`
+- `backup-2024-05-22_02-00-12.sql.gz`
+
+## Security Considerations
+
+- Use dedicated backup users with minimal required permissions
+- Store credentials securely (consider using Docker secrets or external secret management)
+- Enable S3 bucket encryption and access logging
+- Regularly test restore procedures
+- Monitor backup success/failure logs
+
+## Troubleshooting
+
+### Check logs
 ```bash
-docker build -t your-registry/mysql-s3-backup:1.0.0 .
+docker logs mysql-backup
 ```
 
-2. Push to your registry:
+### Test connection manually
 ```bash
-docker push your-registry/mysql-s3-backup:1.0.0
+# Test MySQL connection
+docker exec -it mysql-backup mysql -h $MYSQL_HOST -u $MYSQL_USER -p
+
+# Test PostgreSQL connection  
+docker exec -it mysql-backup psql -h $POSTGRES_HOST -U $POSTGRES_USER -d postgres
+
+# Test S3 connection
+docker exec -it mysql-backup aws s3 ls s3://$S3_BUCKET --endpoint-url $AWS_ENDPOINT_URL
 ```
 
-### Multi-Architecture Build
+### Common Issues
 
-For building and pushing a multi-architecture image (recommended for production use):
-
-1. Use the provided push script:
-```bash
-./push.sh
-```
-
-Or manually:
-
-1. Create and use a new builder instance:
-```bash
-docker buildx create --use
-```
-
-2. Build and push multi-arch image:
-```bash
-docker buildx build --platform linux/amd64,linux/arm64 -t your-registry/mysql-s3-backup:latest --push .
-```
-
-The multi-architecture build ensures the image works on both x86_64 (amd64) and ARM-based systems, making it compatible with various cloud providers and local development environments.
-
-## License
-
-MIT License 
+1. **Connection refused**: Check database host and port
+2. **Authentication failed**: Verify credentials and user permissions
+3. **S3 upload failed**: Check S3 credentials and bucket permissions
+4. **Cron not running**: Verify cron schedule format
