@@ -42,30 +42,22 @@ perform_postgres_backup() {
 
     log "Starting PostgreSQL database backup to s3://$S3_BUCKET/$S3_PREFIX/$file ..."
 
-    # Perform backup
-    if [ -n "${POSTGRES_DATABASE:-}" ]; then
-        # Backup specific database with PostgreSQL equivalent of --add-drop-database
-        if ! pg_dump \
-            -h "$POSTGRES_HOST" \
-            -p "$POSTGRES_PORT" \
-            -U "$POSTGRES_USER" \
-            -d "$POSTGRES_DATABASE" \
-            --clean \
-            --create \
-            --if-exists | gzip >"$temp_file"; then
-            rm -f "$temp_file"
-            error "PostgreSQL backup failed during pg_dump"
-        fi
-    else
-        # Backup all databases
-        if ! pg_dumpall \
-            -h "$POSTGRES_HOST" \
-            -p "$POSTGRES_PORT" \
-            -U "$POSTGRES_USER" \
-            --clean | gzip >"$temp_file"; then
-            rm -f "$temp_file"
-            error "PostgreSQL backup failed during pg_dumpall"
-        fi
+    # Validate that POSTGRES_DATABASE is set
+    if [ -z "${POSTGRES_DATABASE:-}" ]; then
+        error "POSTGRES_DATABASE environment variable must be set for backup."
+    fi
+
+    # Perform backup for specific database only
+    if ! pg_dump \
+        -h "$POSTGRES_HOST" \
+        -p "$POSTGRES_PORT" \
+        -U "$POSTGRES_USER" \
+        -d "$POSTGRES_DATABASE" \
+        --clean \
+        --create \
+        --if-exists | gzip >"$temp_file"; then
+        rm -f "$temp_file"
+        error "PostgreSQL backup failed during pg_dump"
     fi
 
     # Upload to S3
@@ -88,23 +80,74 @@ perform_postgres_restore() {
     # Download from S3
     download_from_s3 "$file" "$temp_file"
 
-    # For PostgreSQL, always restore to postgres maintenance database
-    # This allows the dump's DROP DATABASE and CREATE DATABASE commands to work properly
-    if [ -n "${POSTGRES_DATABASE:-}" ]; then
-        log "Restoring specific database: $POSTGRES_DATABASE (connecting to postgres maintenance DB)"
-    else
-        log "Restoring all databases"
+    log "Restoring specific database: $POSTGRES_DATABASE"
+
+    # Generate a random temp database name
+    TEMPDB="tempdb_restore_$(date +%s)_$RANDOM"
+
+    # Create the temp database
+    if ! psql -h "$POSTGRES_HOST" -p "$POSTGRES_PORT" -U "$POSTGRES_USER" -d postgres -c "\
+        CREATE DATABASE $TEMPDB;\
+    " >/dev/null 2>&1; then
+        error "Failed to create temporary database"
     fi
 
+    # Block new connections to the target database
+    if ! psql -h "$POSTGRES_HOST" -p "$POSTGRES_PORT" -U "$POSTGRES_USER" -d "$TEMPDB" -c "\
+        ALTER DATABASE \"$POSTGRES_DATABASE\"\
+            WITH CONNECTION LIMIT 0;\
+    " >/dev/null 2>&1; then
+        error "Failed to block new connections to the target database"
+    fi
+
+    # Terminate existing connections to the target database
+    if ! psql -h "$POSTGRES_HOST" -p "$POSTGRES_PORT" -U "$POSTGRES_USER" -d "$TEMPDB" -c "\
+        SELECT pg_terminate_backend(pid)\
+        FROM pg_stat_activity\
+        WHERE datname = '$POSTGRES_DATABASE'\
+          AND pid <> pg_backend_pid();\
+    " >/dev/null 2>&1; then
+        error "Failed to terminate existing connections to the target database"
+    fi
+
+    # Drop the target database
+    if ! psql -h "$POSTGRES_HOST" -p "$POSTGRES_PORT" -U "$POSTGRES_USER" -d "$TEMPDB" -c "\
+        DROP DATABASE \"$POSTGRES_DATABASE\";\
+    " >/dev/null 2>&1; then
+        error "Failed to drop the target database"
+    fi
+
+    # Recreate the target database
+    if ! psql -h "$POSTGRES_HOST" -p "$POSTGRES_PORT" -U "$POSTGRES_USER" -d "$TEMPDB" -c "\
+        CREATE DATABASE \"$POSTGRES_DATABASE\";\
+    " >/dev/null 2>&1; then
+        error "Failed to recreate the target database"
+    fi
+
+    # Restore the backup to the target database
     if ! gunzip -c "$temp_file" |
         psql -h "$POSTGRES_HOST" -p "$POSTGRES_PORT" \
-            -U "$POSTGRES_USER" -d postgres; then
+            -U "$POSTGRES_USER" -d "$POSTGRES_DATABASE"; then
         rm -f "$temp_file"
         error "PostgreSQL restore failed during database import"
     fi
 
+    # Restore connection limit
+    if ! psql -h "$POSTGRES_HOST" -p "$POSTGRES_PORT" -U "$POSTGRES_USER" -d "$TEMPDB" -c "\
+        ALTER DATABASE \"$POSTGRES_DATABASE\"\
+            WITH CONNECTION LIMIT -1;\
+    " >/dev/null 2>&1; then
+        error "Failed to restore connection limit"
+    fi
+
     # Cleanup
     rm -f "$temp_file"
+
+    # Drop the temp database
+    if ! psql -h "$POSTGRES_HOST" -p "$POSTGRES_PORT" -U "$POSTGRES_USER" -d "$POSTGRES_DATABASE" -c "DROP DATABASE $TEMPDB;" >/dev/null 2>&1; then
+        error "Failed to drop the temp database"
+    fi
+
     success "PostgreSQL restore completed successfully: $file"
 }
 
