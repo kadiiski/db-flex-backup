@@ -13,5 +13,9 @@ echo "$CRON_SCHEDULE backup backup" >/etc/crontabs/root
 # Ensure all backup scripts are executable
 chmod +x /usr/local/bin/backup_main.sh /usr/local/bin/utils.sh /usr/local/bin/mysql_backup.sh /usr/local/bin/postgres_backup.sh /backup.sh
 
-# Launch cron in foreground with logs to stdout
-exec crond -f -L /dev/stdout
+# Launch cron in background with logs to stdout
+crond -f -L /dev/stdout &
+
+# Start the Next.js server
+cd /app/ui
+exec npm run start
