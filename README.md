@@ -261,6 +261,32 @@ docker exec -it mysql-backup psql -h $POSTGRES_HOST -U $POSTGRES_USER -d postgre
 docker exec -it mysql-backup aws s3 ls s3://$S3_BUCKET --endpoint-url $AWS_ENDPOINT_URL
 ```
 
+
+## Web UI
+
+The project includes a modern web UI (in the `ui/` directory) built with Next.js for managing and restoring database backups. The UI is organized as follows:
+
+- **@/app** (`ui/src/app/`):
+  - Contains the main application pages and components, including the login page, backup list, upload/restore dialogs, and the main dashboard.
+  - Handles user interactions for viewing, downloading, uploading, and restoring backups.
+
+- **@/api** (`ui/src/app/api/`):
+  - Implements API routes for backup operations (list, backup, download, upload, restore, login, logout).
+  - Each route calls the underlying backup scripts/commands and returns results to the UI.
+  - Handles authentication (login/logout) and enforces security for backup operations.
+
+- **@/middleware.ts** (`ui/src/middleware.ts`):
+  - Provides authentication middleware for the UI and API routes.
+  - Checks for a valid JWT in the `auth` cookie and redirects unauthenticated users to the login page.
+  - Protects all routes except `/login` and `/api/login`.
+
+### Authentication & API Integration
+
+- The UI uses a login form to authenticate users. Credentials are checked via the `/api/login` route, which issues a JWT stored in an `auth` cookie.
+- Alternatively, authentication can be performed via a token (see `/api/login` GET handler), allowing for SSO or external integrations. The token is decrypted and used to log in the user securely.
+- All backup management actions (list, create, download, upload, restore) are performed via API routes under `/api/`, which are protected by the authentication middleware.
+- The UI provides a secure, user-friendly way to manage database backups without direct command-line access.
+
 ### Common Issues
 
 1. **Connection refused**: Check database host and port
