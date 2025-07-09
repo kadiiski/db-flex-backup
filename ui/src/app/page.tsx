@@ -1,24 +1,31 @@
 "use client";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useRef } from "react";
-import { Settings, LogOut, Download, RotateCcw, Database, UploadCloud, MoreVertical } from "lucide-react";
+import { LogOut, Download, RotateCcw, Database, UploadCloud } from "lucide-react";
 import RestoreDialog, { BackupFile } from "@/components/RestoreDialog";
 import UploadDialog from "@/components/UploadDialog";
 import { useToast } from "@/hooks/useToast";
+import cronstrue from 'cronstrue';
 
 export default function HomePage() {
   const router = useRouter();
+  const baseButtonClass = "inline-flex items-center gap-2 bg-gray-700 hover:bg-gray-600 text-white rounded shadow cursor-pointer";
+  const actionButtonClass = `${baseButtonClass} py-2 px-4`;
+  const itemButtonClass = `${baseButtonClass} px-3 py-1 text-sm`;
+
+  const retention = process.env.NEXT_PUBLIC_RETENTION || "7";
+  const cronSchedule = process.env.NEXT_PUBLIC_CRON_SCHEDULE || "0 0 * * *";
+  const scheduleText = cronstrue.toString(cronSchedule, { verbose: true });
+  const pageTitle = process.env.NEXT_PUBLIC_BACKUPS_UI_TITLE || "Database Backups";
+
   const [files, setFiles] = useState<BackupFile[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [openMenu, setOpenMenu] = useState<string | null>(null);
   const [restoreDialog, setRestoreDialog] = useState<{ open: boolean; file: BackupFile | null }>({ open: false, file: null });
   const [isGenerating, setIsGenerating] = useState(false);
   const toast = useToast();
-  const menuRefs = useRef<{ [key: string]: HTMLDivElement | null }>({});
   const dialogRef = useRef<HTMLDivElement | null>(null);
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
-  const [actionsOpen, setActionsOpen] = useState(false);
   const [downloadingFile, setDownloadingFile] = useState<string | null>(null);
 
   const fetchBackups = () => {
@@ -41,20 +48,6 @@ export default function HomePage() {
   useEffect(() => {
     fetchBackups();
   }, []);
-
-  useEffect(() => {
-    if (!openMenu) return;
-    function handleClick(e: MouseEvent) {
-      if (openMenu) {
-        const ref = menuRefs.current[openMenu];
-        if (ref && !ref.contains(e.target as Node)) {
-          setOpenMenu(null);
-        }
-      }
-    }
-    document.addEventListener("mousedown", handleClick);
-    return () => document.removeEventListener("mousedown", handleClick);
-  }, [openMenu]);
 
   useEffect(() => {
     if (!restoreDialog.open) return;
@@ -92,7 +85,6 @@ export default function HomePage() {
       toast.showError("Failed to create backup");
     } finally {
       setIsGenerating(false);
-      setActionsOpen(false);
     }
   };
 
@@ -124,59 +116,47 @@ export default function HomePage() {
       toast.showError(message);
     } finally {
       setDownloadingFile(null);
-      setOpenMenu(null);
     }
   };
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-slate-950">
-      <div className="bg-gray-900 p-8 rounded-lg shadow-lg w-full max-w-2xl">
+      <div className="bg-gray-900 p-8 rounded-lg shadow-lg w-full max-w-4xl">
         <div className="flex items-center justify-between mb-8">
-          <h1 className="text-3xl font-bold text-white">Database Backups</h1>
-          <div className="relative">
-            <button
-              className="inline-flex items-center gap-2 bg-gray-800 hover:bg-gray-700 text-white font-medium py-2 px-6 rounded-md shadow-lg transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-800 focus:ring-offset-2 text-base cursor-pointer"
-              onClick={() => setActionsOpen((v) => !v)}
-              aria-haspopup="true"
-              aria-expanded={actionsOpen}
-            >
-              <MoreVertical className="h-5 w-5" />
-              Actions
-            </button>
-            {actionsOpen && (
-              <div className="absolute right-0 top-full mt-2 z-20 bg-gray-900 border border-gray-700 shadow-lg min-w-[220px] text-left">
-                <button
-                  className="w-full flex items-center gap-2 px-4 py-3 text-white hover:bg-gray-700 transition-colors text-sm disabled:opacity-60 disabled:cursor-not-allowed cursor-pointer"
-                  onClick={() => { if (!isGenerating) handleCreateBackup(); }}
-                  disabled={isGenerating}
-                >
-                  {isGenerating ? (
-                    <span className="w-4 h-4 border-2 border-white border-t-transparent border-solid rounded-full animate-spin inline-block" />
-                  ) : (
-                    <Database className="h-4 w-4" />
-                  )}
-                  {isGenerating ? "Generating ..." : "Create new backup"}
-                </button>
-                <button
-                  className="w-full flex items-center gap-2 px-4 py-3 text-white hover:bg-gray-700 transition-colors text-sm cursor-pointer"
-                  onClick={() => { setActionsOpen(false); setUploadDialogOpen(true); }}
-                >
-                  <UploadCloud className="h-4 w-4" />
-                  Upload backup
-                </button>
-                <button
-                  className="w-full flex items-center gap-2 px-4 py-3 text-white hover:bg-gray-700 transition-colors text-sm cursor-pointer"
-                  onClick={() => { setActionsOpen(false); handleLogout(); }}
-                >
-                  <LogOut className="h-4 w-4" />
-                  Logout
-                </button>
-              </div>
+          <h1 className="text-3xl font-bold text-white">{pageTitle}</h1>
+        </div>
+        <div className="flex flex-wrap gap-3 mb-6">
+          <button
+            className={`${actionButtonClass} disabled:opacity-60 disabled:cursor-not-allowed`}
+            onClick={() => { if (!isGenerating) handleCreateBackup(); }}
+            disabled={isGenerating}
+          >
+            {isGenerating ? (
+              <span className="w-4 h-4 border-2 border-white border-t-transparent border-solid rounded-full animate-spin inline-block" />
+            ) : (
+              <Database className="h-4 w-4" />
             )}
-          </div>
+            {isGenerating ? "Backing up ..." : "Backup now"}
+          </button>
+          <button
+            className={actionButtonClass}
+            onClick={() => setUploadDialogOpen(true)}
+          >
+            <UploadCloud className="h-4 w-4" />
+            Upload backup
+          </button>
+          <button
+            className={`${actionButtonClass} ml-auto`}
+            onClick={handleLogout}
+          >
+            <LogOut className="h-4 w-4" />
+            Logout
+          </button>
         </div>
         <div className="bg-gray-800 rounded p-6 mt-4 text-left">
-          <h2 className="text-xl font-semibold text-white mb-4">Backups</h2>
+          <div className="mb-6 text-gray-400">
+            Scheduled backups: {scheduleText.toLowerCase()}, keeping the last {retention} copies
+          </div>
           {loading ? (
             <div className="flex justify-center items-center py-8">
               <div className="w-8 h-8 border-4 border-blue-400 border-t-transparent border-solid rounded-full animate-spin" />
@@ -189,45 +169,31 @@ export default function HomePage() {
             <ul className="divide-y divide-gray-700">
               {files.map((file, idx) => (
                 <li key={file.name + idx} className="py-4 px-4 flex flex-col sm:flex-row sm:items-center sm:justify-between relative group transition-colors duration-150 hover:bg-gray-700/40">
-                  <span className="font-mono text-sm text-blue-300 break-all">{file.name}</span>
+                  <span className="text-blue-300 break-all">{file.name}</span>
                   <span className="text-gray-400 text-xs sm:ml-4">{file.date}</span>
                   <span className="text-green-400 text-xs sm:ml-4">{file.sizeHuman}</span>
-                  <div className="relative flex-shrink-0 sm:ml-4 mt-2 sm:mt-0">
+                  <div className="flex flex-row gap-2 sm:ml-4 mt-2 sm:mt-0">
                     <button
-                      className="p-1 rounded-full hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-400 cursor-pointer"
-                      onClick={() => setOpenMenu(openMenu === file.name ? null : file.name)}
+                      className={`${itemButtonClass} disabled:opacity-60 disabled:cursor-not-allowed`}
+                      onClick={() => { if (!downloadingFile) handleDownload(file.name); }}
+                      disabled={!!downloadingFile}
                     >
-                      <Settings className="h-5 w-5 text-gray-400" />
+                      {downloadingFile === file.name ? (
+                        <span className="w-4 h-4 border-2 border-white border-t-transparent border-solid rounded-full animate-spin inline-block" />
+                      ) : (
+                        <Download className="w-4 h-4" />
+                      )}
+                      Download
                     </button>
-                    {openMenu === file.name && (
-                      <div
-                        ref={el => { menuRefs.current[file.name] = el; }}
-                        className="absolute right-0 top-8 z-10 bg-gray-900 border border-gray-700 rounded shadow-lg min-w-[160px]"
-                      >
-                        <button
-                          className="block w-full text-left px-4 py-2 text-sm text-white hover:bg-gray-700 rounded-t cursor-pointer flex items-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
-                          onClick={() => { if (!downloadingFile) handleDownload(file.name); }}
-                          disabled={!!downloadingFile}
-                        >
-                          {downloadingFile === file.name ? (
-                            <span className="w-4 h-4 border-2 border-white border-t-transparent border-solid rounded-full animate-spin inline-block" />
-                          ) : (
-                            <Download className="w-4 h-4" />
-                          )}
-                          {downloadingFile === file.name ? 'Downloading ...' : 'Download'}
-                        </button>
-                        <button
-                          className="block w-full text-left px-4 py-2 text-sm text-white hover:bg-gray-700 rounded-b cursor-pointer flex items-center gap-2"
-                          onClick={() => {
-                            setOpenMenu(null);
-                            setRestoreDialog({ open: true, file });
-                          }}
-                        >
-                          <RotateCcw className="w-4 h-4" />
-                          Restore
-                        </button>
-                      </div>
-                    )}
+                    <button
+                      className={itemButtonClass}
+                      onClick={() => {
+                        setRestoreDialog({ open: true, file });
+                      }}
+                    >
+                      <RotateCcw className="w-4 h-4" />
+                      Restore
+                    </button>
                   </div>
                 </li>
               ))}
@@ -246,10 +212,6 @@ export default function HomePage() {
         onCancel={() => setUploadDialogOpen(false)}
         onUploadSuccess={fetchBackups}
       />
-      {/* Close dropdown on outside click */}
-      {actionsOpen && (
-        <div className="fixed inset-0 z-10" onClick={() => setActionsOpen(false)} />
-      )}
     </div>
   );
 }

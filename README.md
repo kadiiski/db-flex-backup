@@ -287,6 +287,18 @@ The project includes a modern web UI (in the `ui/` directory) built with Next.js
 - All backup management actions (list, create, download, upload, restore) are performed via API routes under `/api/`, which are protected by the authentication middleware.
 - The UI provides a secure, user-friendly way to manage database backups without direct command-line access.
 
+### UI Configuration
+
+The UI automatically reflects the container's configuration through these environment variables:
+
+| Variable | Description | Example | Required |
+|----------|-------------|---------|----------|
+| `BACKUPS_UI_TITLE` | Custom title for the backup management page | `"Database Backups"` | No |
+| `RETENTION_COUNT` | Number of backups to keep (shown in UI) | `7` | No |
+| `CRON_SCHEDULE` | Cron schedule for backups (shown in UI) | `0 0 * * *` | No |
+
+These container environment variables are automatically passed to the UI, allowing it to display accurate backup configuration information without additional setup.
+
 ### Common Issues
 
 1. **Connection refused**: Check database host and port
