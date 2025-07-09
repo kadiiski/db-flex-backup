@@ -22,6 +22,5 @@
 **/__mocks__
 **/coverage
 
-# Ignore environment files (optional, if you don't want to copy them)
-.env
-.env.* 
+# Ignore environment files
+.env.*
