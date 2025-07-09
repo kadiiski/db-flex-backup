@@ -299,7 +299,7 @@ The UI automatically reflects the container's configuration through these enviro
 
 These container environment variables are automatically passed to the UI, allowing it to display accurate backup configuration information without additional setup.
 
-### Common Issues
+## Common Issues
 
 1. **Connection refused**: Check database host and port
 2. **Authentication failed**: Verify credentials and user permissions
