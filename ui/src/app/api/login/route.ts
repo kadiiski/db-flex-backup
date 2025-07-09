@@ -57,7 +57,7 @@ async function authenticateAndRespond(username: string, password: string) {
   }
   // On success, create JWT and set cookie
   const secret = new TextEncoder().encode(process.env.SERVICE_USER_ADMIN!);
-  const exp = Math.floor(Date.now() / 1000) + 12 * 60 * 60; // 12 hours
+  const exp = Math.floor(Date.now() / 1000) + 60 * 60; // 1 hour
   const jwt = await new SignJWT({ username })
     .setProtectedHeader({ alg: 'HS256' })
     .setExpirationTime(exp)
@@ -67,7 +67,7 @@ async function authenticateAndRespond(username: string, password: string) {
     httpOnly: true,
     secure: true,
     sameSite: 'strict',
-    maxAge: 12 * 60 * 60,
+    maxAge: 60 * 60,
     path: '/',
   });
   return response;
@@ -128,6 +128,14 @@ export async function GET(req: NextRequest) {
       let decrypted = decipher.update(encrypted, undefined, 'utf8');
       decrypted += decipher.final('utf8');
       const payload = JSON.parse(decrypted);
+      
+      // Check if token has expired
+      if (payload.expiration && payload.expiration < Date.now()) {
+        failedAttempts.count += 1;
+        failedAttempts.lastFailed = Date.now();
+        return NextResponse.json({ error: 'Token has expired' }, { status: 401 });
+      }
+      
       username = payload.username;
       providedPassword = payload.password;
     } catch {

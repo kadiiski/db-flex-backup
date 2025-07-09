@@ -284,6 +284,21 @@ The project includes a modern web UI (in the `ui/` directory) built with Next.js
 
 - The UI uses a login form to authenticate users. Credentials are checked via the `/api/login` route, which issues a JWT stored in an `auth` cookie.
 - Alternatively, authentication can be performed via a token (see `/api/login` GET handler), allowing for SSO or external integrations. The token is decrypted and used to log in the user securely.
+- For programmatic access, you can generate a secure login token via `/api/login/generate-token`:
+  ```bash
+  # Generate a login token (expires in 1 hour)
+  curl -X POST https://your-server/api/login/generate-token \
+    -H "Content-Type: application/json" \
+    -d '{"username": "your_db_username", "password": "your_db_password"}'
+
+  # Response:
+  {
+    "token": "base64_encoded_token"
+  }
+  ```
+  The generated token:
+  - Expires in 1 hour
+  - Can be used directly via the `loginUrl` for browser-based redirects
 - All backup management actions (list, create, download, upload, restore) are performed via API routes under `/api/`, which are protected by the authentication middleware.
 - The UI provides a secure, user-friendly way to manage database backups without direct command-line access.
 
