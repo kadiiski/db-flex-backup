@@ -261,7 +261,87 @@ docker exec -it mysql-backup psql -h $POSTGRES_HOST -U $POSTGRES_USER -d postgre
 docker exec -it mysql-backup aws s3 ls s3://$S3_BUCKET --endpoint-url $AWS_ENDPOINT_URL
 ```
 
-### Common Issues
+
+## Web UI
+
+The project includes a modern web UI (in the `ui/` directory) built with Next.js for managing and restoring database backups. The UI is organized as follows:
+
+- **@/app** (`ui/src/app/`):
+  - Contains the main application pages and components, including the login page, backup list, upload/restore dialogs, and the main dashboard.
+  - Handles user interactions for viewing, downloading, uploading, and restoring backups.
+
+- **@/api** (`ui/src/app/api/`):
+  - Implements API routes for backup operations (list, backup, download, upload, restore, login, logout).
+  - Each route calls the underlying backup scripts/commands and returns results to the UI.
+  - Handles authentication (login/logout) and enforces security for backup operations.
+
+- **@/middleware.ts** (`ui/src/middleware.ts`):
+  - Provides authentication middleware for the UI and API routes.
+  - Checks for a valid JWT in the `auth` cookie and redirects unauthenticated users to the login page.
+  - Protects all routes except `/login` and `/api/login`.
+
+### Authentication & API Integration
+
+- The UI uses a login form to authenticate users. Credentials are checked via the `/api/login` route, which issues a JWT stored in an `auth` cookie.
+- Alternatively, authentication can be performed via a token (see `/api/login` GET handler), allowing for SSO or external integrations. The token is decrypted and used to log in the user securely.
+- For programmatic access, you can generate a secure login token via `/api/login/generate-token`:
+  ```bash
+  # Generate a login token (expires in 1 hour)
+  curl -X POST https://your-server/api/login/generate-token \
+    -H "Content-Type: application/json" \
+    -d '{"username": "your_db_username", "password": "your_db_password"}'
+
+  # Response:
+  {
+    "token": "base64_encoded_token"
+  }
+  ```
+  The generated token:
+  - Expires in 1 hour
+  - Can be used directly via the `loginUrl` for browser-based redirects
+- All backup management actions (list, create, download, upload, restore) are performed via API routes under `/api/`, which are protected by the authentication middleware.
+- The UI provides a secure, user-friendly way to manage database backups without direct command-line access.
+
+### UI Configuration
+
+The UI automatically reflects the container's configuration through these environment variables:
+
+| Variable | Description | Example | Required |
+|----------|-------------|---------|----------|
+| `BACKUPS_UI_TITLE` | Custom title for the backup management page | `"Database Backups"` | No |
+| `RETENTION_COUNT` | Number of backups to keep (shown in UI) | `7` | No |
+| `CRON_SCHEDULE` | Cron schedule for backups (shown in UI) | `0 0 * * *` | No |
+
+These container environment variables are automatically passed to the UI, allowing it to display accurate backup configuration information without additional setup.
+
+**Note:**
+If you want these variables (such as `BACKUPS_UI_TITLE`, `RETENTION_COUNT`, and `CRON_SCHEDULE`) to be available at both build time (for use in the Dockerfile) and runtime (for the running container), you must provide them in two places in your `docker-compose.yml`:
+
+- As build arguments under `build.args` (for build-time use)
+- As environment variables under `environment` (for runtime use)
+
+#### Example: Providing Variables for Both Build and Runtime
+
+```yaml
+services:
+  postgres-backup-ui:
+    build:
+      context: .
+      args:
+        BACKUPS_UI_TITLE: "Title here"
+        RETENTION_COUNT: 12
+        CRON_SCHEDULE: 0 0 * * *
+    environment:
+      BACKUPS_UI_TITLE: "Title here"
+      RETENTION_COUNT: 12
+      CRON_SCHEDULE: 0 0 * * *
+    # ... other config ...
+```
+
+- `build.args` makes the variables available during the Docker image build (e.g., for use in the Dockerfile with `ARG` and `ENV`)
+- `environment` makes the variables available to the running container and the application inside it
+
+## Common Issues
 
 1. **Connection refused**: Check database host and port
 2. **Authentication failed**: Verify credentials and user permissions

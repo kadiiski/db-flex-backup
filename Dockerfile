@@ -2,7 +2,26 @@
 # A Docker image for automated MySQL and PostgreSQL database backups to S3-compatible storage
 # Version: 2.0.0
 
-FROM alpine:3.18
+# --- Builder Stage ---
+FROM node:24.3.0-alpine3.22 AS builder
+
+WORKDIR /app/ui
+COPY ui/package.json ui/package-lock.json ./
+RUN npm ci
+COPY ui .
+
+ARG BACKUPS_UI_TITLE
+ARG RETENTION_COUNT
+ARG CRON_SCHEDULE
+
+ENV BACKUPS_UI_TITLE=${BACKUPS_UI_TITLE}
+ENV RETENTION_COUNT=${RETENTION_COUNT}
+ENV CRON_SCHEDULE=${CRON_SCHEDULE}
+
+RUN npm run build
+
+# --- Final Stage ---
+FROM node:24.3.0-alpine3.22
 
 LABEL maintainer="Ivaylo Kadiyski <kadiiski94@gmail.com>"
 LABEL description="MySQL and PostgreSQL cron database backup & restore with S3-compatible storage"
@@ -34,6 +53,10 @@ RUN chmod +x /entrypoint.sh /usr/local/bin/backup_main.sh /usr/local/bin/utils.s
 # Create backup command symlink for easy access
 RUN ln -s /usr/local/bin/backup_main.sh /usr/local/bin/backup
 
+# Copy built UI from builder stage
+WORKDIR /app
+COPY --from=builder /app/ui ./ui
+
 # Set default environment variables
 ENV CRON_SCHEDULE="0 12 * * *" \
     DB_TYPE="mysql" \
@@ -42,4 +65,5 @@ ENV CRON_SCHEDULE="0 12 * * *" \
     S3_PREFIX="backups" \
     RETENTION_COUNT=7
 
+WORKDIR /app/ui
 ENTRYPOINT ["/entrypoint.sh"]

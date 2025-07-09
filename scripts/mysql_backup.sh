@@ -96,6 +96,43 @@ perform_mysql_restore() {
     success "MySQL restore completed successfully: $file"
 }
 
+check_mysql_login() {
+    local user=""
+    local password=""
+
+    # Parse arguments
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --user)
+                user="$2"; shift 2;;
+            --password)
+                password="$2"; shift 2;;
+            *)
+                echo "Unknown argument: $1" >&2; return 1;;
+        esac
+    done
+
+    # Validate arguments
+    if [[ -z "$user" || -z "$password" ]]; then
+        echo "false"
+        return 1
+    fi
+
+    mysql \
+        -h "$MYSQL_HOST" \
+        -P "$MYSQL_PORT" \
+        -u "$user" \
+        -p "$password" \
+        -e "\q" >/dev/null 2>&1
+    if [[ $? -eq 0 ]]; then
+        echo "true"
+        return 0
+    else
+        echo "false"
+        return 1
+    fi
+}
+
 # Main MySQL backup handler function
 handle_mysql_command() {
     # Check requirements before proceeding
@@ -115,6 +152,28 @@ handle_mysql_command() {
         fi
         perform_mysql_restore "$2"
         ;;
+    check-login)
+        shift
+        check_mysql_login "$@"
+        ;;
+    download)
+        if [ -z "${2:-}" ]; then
+            error "Download command requires a s3 filename"
+        fi
+        if [ -z "${3:-}" ]; then
+            error "Download command requires a temp filename"
+        fi
+        download_from_s3 "$2" "$3"
+        ;;
+    upload)
+        if [ -z "${2:-}" ]; then
+            error "Upload command requires a temp filedir"
+        fi
+        local timestamp=$(date +'%Y-%m-%d_%H-%M-%S')
+        local file="backup-$timestamp.sql.gz"
+        upload_to_s3 "$2" "$file"
+        enforce_retention
+        ;;
     *)
         echo "MySQL backup handler"
         echo "Usage: mysql_backup.sh <command> [args]"
@@ -123,6 +182,9 @@ handle_mysql_command() {
         echo "  list                    List available backups"
         echo "  backup                  Create a new MySQL backup"
         echo "  restore <filename>      Restore from a specific backup file"
+        echo "  check-login             Check MySQL login"
+        echo "  download <s3 filename> <temp filename>     Download a backup file from S3"
+        echo "  upload <temp filename>  Upload a backup file to S3"
         exit 1
         ;;
     esac

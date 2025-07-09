@@ -1,0 +1,26 @@
+# Ignore node_modules everywhere
+**/node_modules
+
+# Ignore local build output
+**/.next
+**/dist
+**/out
+
+# Ignore logs
+*.log
+**/*.log
+
+# Ignore git and editor files
+.git
+.gitignore
+.DS_Store
+*.swp
+*.swo
+
+# Ignore test and coverage files
+**/__tests__
+**/__mocks__
+**/coverage
+
+# Ignore environment files
+.env.*
