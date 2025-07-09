@@ -314,6 +314,33 @@ The UI automatically reflects the container's configuration through these enviro
 
 These container environment variables are automatically passed to the UI, allowing it to display accurate backup configuration information without additional setup.
 
+**Note:**
+If you want these variables (such as `BACKUPS_UI_TITLE`, `RETENTION_COUNT`, and `CRON_SCHEDULE`) to be available at both build time (for use in the Dockerfile) and runtime (for the running container), you must provide them in two places in your `docker-compose.yml`:
+
+- As build arguments under `build.args` (for build-time use)
+- As environment variables under `environment` (for runtime use)
+
+#### Example: Providing Variables for Both Build and Runtime
+
+```yaml
+services:
+  postgres-backup-ui:
+    build:
+      context: .
+      args:
+        BACKUPS_UI_TITLE: "Title here"
+        RETENTION_COUNT: 12
+        CRON_SCHEDULE: 0 0 * * *
+    environment:
+      BACKUPS_UI_TITLE: "Title here"
+      RETENTION_COUNT: 12
+      CRON_SCHEDULE: 0 0 * * *
+    # ... other config ...
+```
+
+- `build.args` makes the variables available during the Docker image build (e.g., for use in the Dockerfile with `ARG` and `ENV`)
+- `environment` makes the variables available to the running container and the application inside it
+
 ## Common Issues
 
 1. **Connection refused**: Check database host and port
