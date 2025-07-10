@@ -66,7 +66,7 @@ async function authenticateAndRespond(username: string, password: string) {
   response.cookies.set('auth', jwt, {
     httpOnly: true,
     secure: true,
-    sameSite: 'strict',
+    sameSite: 'lax',
     maxAge: 60 * 60,
     path: '/',
   });
@@ -163,7 +163,10 @@ export async function GET(req: NextRequest) {
       // Copy the auth cookie from the response
       const authCookie = response.cookies.get('auth');
       if (authCookie) {
-        redirectRes.cookies.set('auth', authCookie.value, authCookie);
+        redirectRes.cookies.set('auth', authCookie.value, {
+          ...authCookie,
+          sameSite: 'lax',
+        });
       }
       return redirectRes;
     }
