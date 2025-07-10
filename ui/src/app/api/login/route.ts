@@ -156,7 +156,10 @@ export async function GET(req: NextRequest) {
       failedAttempts.count = 0;
       failedAttempts.lastFailed = 0;
       // Redirect to /
-      const redirectRes = NextResponse.redirect(new URL('/', req.url));
+      const host = req.headers.get('host');
+      const protocol = req.headers.get('x-forwarded-proto') || 'https';
+      const redirectUrl = `${protocol}://${host}/`;
+      const redirectRes = NextResponse.redirect(redirectUrl);
       // Copy the auth cookie from the response
       const authCookie = response.cookies.get('auth');
       if (authCookie) {
