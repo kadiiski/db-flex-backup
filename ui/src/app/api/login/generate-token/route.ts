@@ -2,9 +2,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import crypto from 'crypto';
 
 function encryptLoginPayload(username: string, password: string) {
-  const dbPassword = process.env.POSTGRES_PASSWORD;
+  const dbType = process.env.DB_TYPE?.toUpperCase();
+  const dbPassword = process.env[`${dbType}_PASSWORD`];
   if (!dbPassword) {
-    throw new Error('Server misconfiguration: POSTGRES_PASSWORD not set');
+    throw new Error(`Server misconfiguration: ${dbType}_PASSWORD not set`);
   }
 
   const key = crypto.createHash('sha256').update(dbPassword).digest();
@@ -32,7 +33,9 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    if (!process.env.POSTGRES_PASSWORD) {
+    const dbType = process.env.DB_TYPE?.toUpperCase();
+    const dbPassword = process.env[`${dbType}_PASSWORD`];
+    if (!dbPassword) {
       return NextResponse.json(
         { error: 'Server misconfiguration' },
         { status: 500 }

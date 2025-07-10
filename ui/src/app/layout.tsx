@@ -3,8 +3,6 @@ import "./globals.css";
 import { Roboto } from "next/font/google";
 import { Toaster } from "sonner";
 
-const pageTitle = process.env.NEXT_PUBLIC_BACKUPS_UI_TITLE || "Database Backups";
-
 const roboto = Roboto({
   weight: ["300", "400", "500", "700"],
   subsets: ["latin"],
@@ -12,7 +10,7 @@ const roboto = Roboto({
 });
 
 export const metadata: Metadata = {
-  title: pageTitle,
+  title: process.env.BACKUPS_UI_TITLE || "Database Backups",
   description: 'UI for managing database backups',
 };
 

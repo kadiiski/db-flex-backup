@@ -108,7 +108,8 @@ export async function GET(req: NextRequest) {
     if (!token) {
       return NextResponse.json({ error: 'Missing token' }, { status: 400 });
     }
-    const password = process.env.POSTGRES_PASSWORD;
+    const dbType = process.env.DB_TYPE?.toUpperCase();
+    const password = process.env[`${dbType}_PASSWORD`];
     if (!password) {
       return NextResponse.json({ error: 'Server misconfiguration' }, { status: 500 });
     }
