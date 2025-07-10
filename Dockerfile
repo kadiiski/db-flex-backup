@@ -65,5 +65,6 @@ ENV CRON_SCHEDULE="0 12 * * *" \
     S3_PREFIX="backups" \
     RETENTION_COUNT=7
 
+EXPOSE 6969
 WORKDIR /app/ui
 ENTRYPOINT ["/entrypoint.sh"]

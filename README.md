@@ -261,7 +261,6 @@ docker exec -it mysql-backup psql -h $POSTGRES_HOST -U $POSTGRES_USER -d postgre
 docker exec -it mysql-backup aws s3 ls s3://$S3_BUCKET --endpoint-url $AWS_ENDPOINT_URL
 ```
 
-
 ## Web UI
 
 The project includes a modern web UI (in the `ui/` directory) built with Next.js for managing and restoring database backups. The UI is organized as follows:
