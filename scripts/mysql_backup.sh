@@ -122,7 +122,7 @@ check_mysql_login() {
         -h "$MYSQL_HOST" \
         -P "$MYSQL_PORT" \
         -u "$user" \
-        -p "$password" \
+        -p"$password" \
         -e "\q" >/dev/null 2>&1
     if [[ $? -eq 0 ]]; then
         echo "true"

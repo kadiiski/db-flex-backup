@@ -1,6 +1,6 @@
 # database-s3-backup
 # A Docker image for automated MySQL and PostgreSQL database backups to S3-compatible storage
-# Version: 2.0.0
+# Version: 2.0.4
 
 # --- Builder Stage ---
 FROM node:24.3.0-alpine3.22 AS builder
@@ -17,7 +17,7 @@ FROM node:24.3.0-alpine3.22
 
 LABEL maintainer="Ivaylo Kadiyski <kadiiski94@gmail.com>"
 LABEL description="MySQL and PostgreSQL cron database backup & restore with S3-compatible storage"
-LABEL version="2.0.0"
+LABEL version="2.0.4"
 
 # Install required packages for both MySQL and PostgreSQL
 RUN apk add --no-cache \
