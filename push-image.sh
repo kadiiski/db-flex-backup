@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-VERSION="2.0.4"
+VERSION="2.0.5"
 
 echo "Building and pushing database-s3-backup:${VERSION}..."
 echo "This image supports both MySQL and PostgreSQL backups"
